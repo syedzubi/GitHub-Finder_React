@@ -1,68 +1,90 @@
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+# RFTB2019 GitHub Finder
 
-## Available Scripts
+The first project in Brad Traversy's [React Front to Back 2019](https://www.udemy.com/share/101XdqAkUadVtQTH4=/) Udemy course.
 
-In the project directory, you can run:
+The master branch is the final completed project from the course.
 
-### `npm start`
+## This branch I have refactored to take a more hook friendly context approach.
 
-Runs the app in the development mode.<br />
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+I think Brad at the time of the course tried to substitute lifecycle methods with the closest hooks approximation which is understandable and I see a lot of tutorials and courses doing much the same. Hooks were very new at the time of recording,
+however hooks require a completely different approach and thought process really. We need to think in terms of hooks and functions and not lifecycle.
 
-The page will reload if you make edits.<br />
-You will also see any lint errors in the console.
+If you're looking at this branch and wondering why in the course we had to use `// eslint-disable-next-line` or thought _this doesn't feel right ignoring the linting rules_, then I urge you to have a read of [this post on overreacted by Dan Abramov](https://overreacted.io/a-complete-guide-to-useeffect/). It covers a lot more than just `useEffect`
 
-### `npm test`
+To summarize the issues we faced in the course though, and why we had to use `// eslint-disable-next-line` at all is that all our data fetching methods are in our context state (GitHubState.js) and passed down to all our components via the Provider. The problem with this is that every time we update our context state we create a new function which is a side effect and react tells us that side effects should be in a useEffect. If we include these functions in our useEffect dependency array (as the linter suggests) in `User.js` then each time we fetch data and our reducer runs it updates the context which triggers a re-render (creating a whole set of new functions). The useEffect dependency sees it as a new function and triggers another render which again updates the state when we call the function in our useEffect, which triggers another re-render and so on.... infinite loop of re-rendering.
 
-Launches the test runner in the interactive watch mode.<br />
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+The solution is not to add an empty array and tell the linter to ignore it (trying to make a componentDidMount out of useEffect), but to think in terms of hooks and functions.
 
-### `npm run build`
+so...
 
-Builds the app for production to the `build` folder.<br />
-It correctly bundles React in production mode and optimizes the build for the best performance.
+1. Take all our fetching data methods out of GitHubState to keep them pure and not re-create a new function on each render/update [actions.js](https://github.com/bushblade/RFTB2019_GitHub_Finder/blob/refactor/src/context/github/actions.js).
+2. return the promise from our data fetching methods.
+3. Only pass down our dispatch from our GitHubState Provider (React guarantees that our dispatch returned from useReducer is static and won't change) [GitHubState.js](https://github.com/bushblade/RFTB2019_GitHub_Finder/blob/refactor/src/context/github/GitHubState.js).
+4. Import the data fetching method we need in the component we need it, call that function in a component level useEffect and then dipsatch from our component [User.js](https://github.com/bushblade/RFTB2019_GitHub_Finder/blob/refactor/src/components/users/User.js).
 
-The build is minified and the filenames include the hashes.<br />
-Your app is ready to be deployed!
+This cleans up our app considerably, follows the good advice from the react guidelines/linter, improves the quality and readability of our code and now we are thinking in terms of hooks and functions.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## Updates since course published
 
-### `npm run eject`
+Since the course was published, GitHub has [depreciated authentication via URL query parameters](https://developer.github.com/changes/2019-11-05-deprecated-passwords-and-authorizations-api/#authenticating-using-query-parameters)
+You can get an access token by following [these instructions](https://help.github.com/en/github/authenticating-to-github/creating-a-personal-access-token-for-the-command-line)
+For this app we don't need to add any permissions so don't select any in the _scopes_.
+**DO NOT SHARE ANY TOKENS THAT HAVE PERMISSIONS**
+This would leave your account or repositories vulnerable, depending on permissions set.
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+On this branch you can see how to use the generated token in [/src/context/github/actions.js](https://github.com/bushblade/RFTB2019_GitHub_Finder/blob/refactor/src/context/github/actions.js)
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+You'll also need to change up your `.env.local` file to include
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+```
+REACT_APP_GITHUB_TOKEN='token <your_no_permissions_token_here>'
+```
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+## Some notes before you deploy
 
-## Learn More
+For the environment variables we set in the Netlify UI to be used we need to let Netlify run the build which as far as I know only works if you deploy from GitHub.
+If we run `npm run` build then `netlify deploy --prod` as per lesson **5-35** we are running the build on our local machine.
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+Additionally any environment variable we set needs to be prefixed with `REACT_APP_`, even for deploying to Netlify.
+`process.env.NODE_ENV` allows us to check the the environment
+(**develpment** in dev server and **production** in build).
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+**You cannot override NODE_ENV manually**
 
-### Code Splitting
+[create-react-app docs for further reading](https://create-react-app.dev/docs/adding-custom-environment-variables/)
 
-This section has moved here: https://facebook.github.io/create-react-app/docs/code-splitting
+> The environment variables only prevent your keys from being shared in your GitHub repo, anyone who inspects the code or looks at the network requests **will see your keys**, they're not private unless the server is making the API requests, not our client side app.
+> So this may be something you would want to be aware of going into production with your own projects.
+> So even if we do set up continuous deployment from GitHub to Netlify our keys will be available after Netlify runs the build.
 
-### Analyzing the Bundle Size
+### To install and run locally
 
-This section has moved here: https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size
+Clone the repo
 
-### Making a Progressive Web App
+```bash
+git clone https://github.com/bushblade/RFTB2019_GitHub_Finder.git
+```
 
-This section has moved here: https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app
+Change into directory project
 
-### Advanced Configuration
+```bash
+cd RFTB2019_GitHub_Finder
+```
 
-This section has moved here: https://facebook.github.io/create-react-app/docs/advanced-configuration
+install
 
-### Deployment
+```bash
+npm i
+```
 
-This section has moved here: https://facebook.github.io/create-react-app/docs/deployment
+Run the dev server
 
-### `npm run build` fails to minify
+```bash
+npm start
+```
 
-This section has moved here: https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify
+Build the project
+
+```bash
+npm run build
+```
